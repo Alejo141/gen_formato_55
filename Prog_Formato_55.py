@@ -1,64 +1,52 @@
 import streamlit as st
 import pandas as pd
-import io
+import os
 
-def procesar_archivos(formato_55, cartera_90_360, cartera_90):
-    # Cargar los archivos CSV
-    df_formato_55 = pd.read_csv(formato_55, dtype=str)
-    df_cartera_90_360 = pd.read_csv(cartera_90_360, dtype=str)
-    df_cartera_90 = pd.read_csv(cartera_90, dtype=str)
+def procesar_archivos(archivo_formato_55, archivo_cartera_90_360, archivo_cartera_90):
+    # Cargar los CSVs
+    df_55 = pd.read_csv(archivo_formato_55, dtype=str)
+    df_90_360 = pd.read_csv(archivo_cartera_90_360, dtype=str)
+    df_90 = pd.read_csv(archivo_cartera_90, dtype=str)
     
     # Normalizar nombres de columnas
-    df_formato_55.columns = df_formato_55.columns.str.strip().str.upper()
-    df_cartera_90_360.columns = df_cartera_90_360.columns.str.strip().str.upper()
-    df_cartera_90.columns = df_cartera_90.columns.str.strip().str.upper()
+    for df in [df_55, df_90_360, df_90]:
+        df.columns = df.columns.str.strip().str.upper()
     
-    # Convertir las columnas numéricas
-    df_formato_55['SALDO_CAR_90A360'] = pd.to_numeric(df_formato_55['SALDO_CAR_90A360'], errors='coerce').fillna(0)
-    df_formato_55['SALDO_CAR_90'] = pd.to_numeric(df_formato_55['SALDO_CAR_90'], errors='coerce').fillna(0)
-    df_cartera_90_360['SALDO_FACTURA'] = pd.to_numeric(df_cartera_90_360['SALDO_FACTURA'], errors='coerce').fillna(0)
-    df_cartera_90['SALDO_FACTURA'] = pd.to_numeric(df_cartera_90['SALDO_FACTURA'], errors='coerce').fillna(0)
+    # Convertir columnas a numérico
+    df_90_360['SALDO_FACTURA'] = pd.to_numeric(df_90_360['SALDO_FACTURA'], errors='coerce').fillna(0)
+    df_90['SALDO_FACTURA'] = pd.to_numeric(df_90['SALDO_FACTURA'], errors='coerce').fillna(0)
+    df_55['SALDO_CAR_90A360'] = pd.to_numeric(df_55['SALDO_CAR_90A360'], errors='coerce').fillna(0)
+    df_55['SALDO_CAR_90'] = pd.to_numeric(df_55['SALDO_CAR_90'], errors='coerce').fillna(0)
     
-    # Crear diccionarios de mapeo por COD_LOCALIDAD
-    mapeo_saldo_90_360 = df_cartera_90_360.set_index('COD_LOCALIDAD')['SALDO_FACTURA'].to_dict()
-    mapeo_saldo_90 = df_cartera_90.set_index('COD_LOCALIDAD')['SALDO_FACTURA'].to_dict()
+    # Crear diccionarios de mapeo
+    mapeo_90_360 = df_90_360.set_index('COD_LOCALIDAD')['SALDO_FACTURA'].to_dict()
+    mapeo_90 = df_90.set_index('COD_LOCALIDAD')['SALDO_FACTURA'].to_dict()
     
-    # Función para actualizar los saldos
-    def actualizar_saldos(row):
-        cod_localidad = row['COD_LOCALIDAD']
-        saldo_90_360 = mapeo_saldo_90_360.get(cod_localidad, 0)
-        saldo_90 = mapeo_saldo_90.get(cod_localidad, 0)
-        if cod_localidad == "4443000000001":
-            row['SALDO_CAR_90A360'] += saldo_90_360 / 4
-            row['SALDO_CAR_90'] += saldo_90 / 4
-        else:
-            row['SALDO_CAR_90A360'] += saldo_90_360
-            row['SALDO_CAR_90'] += saldo_90
-        return row
+    # Actualizar valores en df_55
+    df_55['SALDO_CAR_90A360'] += df_55['COD_LOCALIDAD'].map(mapeo_90_360).fillna(0)
+    df_55['SALDO_CAR_90'] += df_55['COD_LOCALIDAD'].map(mapeo_90).fillna(0)
     
-    # Aplicar la función a cada fila del DataFrame
-    df_formato_55 = df_formato_55.apply(actualizar_saldos, axis=1)
+    # Caso especial COD_LOCALIDAD == "4443000000001"
+    df_55.loc[df_55['COD_LOCALIDAD'] == "4443000000001", 'SALDO_CAR_90A360'] += mapeo_90_360.get("4443000000001", 0) / 4
+    df_55.loc[df_55['COD_LOCALIDAD'] == "4443000000001", 'SALDO_CAR_90'] += mapeo_90.get("4443000000001", 0) / 4
     
-    # Guardar el resultado en memoria
-    output = io.BytesIO()
-    df_formato_55.to_csv(output, index=False, encoding="utf-8")
-    output.seek(0)
-    return output
+    # Generar nombre del archivo de salida
+    nombre_salida = f"ZNISISFV_64716_54_{os.path.basename(archivo_formato_55.name)}"
+    df_55.to_csv(nombre_salida, index=False)
+    
+    return nombre_salida
 
-st.title("Procesamiento de Archivos CSV")
+st.title("Procesador de Archivos CSV")
 
-# Carga de archivos
-archivo_formato_55 = st.file_uploader("Cargar archivo Formato_55", type="csv")
-archivo_cartera_90_360 = st.file_uploader("Cargar archivo Cartera_90_360", type="csv")
-archivo_cartera_90 = st.file_uploader("Cargar archivo Cartera_90", type="csv")
+archivo_formato_55 = st.file_uploader("Subir archivo Formato 55", type=["csv"])
+archivo_cartera_90_360 = st.file_uploader("Subir archivo Cartera 90-360", type=["csv"])
+archivo_cartera_90 = st.file_uploader("Subir archivo Cartera 90", type=["csv"])
 
-if archivo_formato_55 and archivo_cartera_90_360 and archivo_cartera_90:
-    if st.button("Procesar Archivos"):
-        archivo_salida = procesar_archivos(archivo_formato_55, archivo_cartera_90_360, archivo_cartera_90)
-        st.download_button(
-            label="Descargar Archivo Procesado",
-            data=archivo_salida,
-            file_name="ZNISISFV_64716_55_112024.csv",
-            mime="text/csv"
-        )
-        st.success("Archivo procesado correctamente.")
+if st.button("Procesar Archivos"):
+    if archivo_formato_55 and archivo_cartera_90_360 and archivo_cartera_90:
+        nombre_salida = procesar_archivos(archivo_formato_55, archivo_cartera_90_360, archivo_cartera_90)
+        st.success(f"Archivo generado: {nombre_salida}")
+        with open(nombre_salida, "rb") as f:
+            st.download_button("Descargar Archivo", f, file_name=nombre_salida)
+    else:
+        st.error("Por favor, suba los tres archivos CSV.")
