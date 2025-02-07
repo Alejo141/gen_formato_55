@@ -36,11 +36,16 @@ def procesar_archivos(archivo_formato_55, archivo_cartera_90_360, archivo_carter
     
     return nombre_salida
 
-st.title("Procesador de Archivos CSV")
+st.title("Generar Formato IUF1")
 
-archivo_formato_55 = st.file_uploader("Subir archivo Formato 55", type=["csv"])
-archivo_cartera_90_360 = st.file_uploader("Subir archivo Cartera 90-360", type=["csv"])
-archivo_cartera_90 = st.file_uploader("Subir archivo Cartera 90", type=["csv"])
+st.subheader("Cargar archivo de la Mora")
+archivo_cartera_90_360 = st.file_uploader("Subir archivo Cartera 90-360", type=["csv"], key="cartera_90_360")
+
+st.subheader("Cargar archivo a actualizar")
+archivo_formato_55 = st.file_uploader("Subir archivo Formato 55", type=["csv"], key="formato_55")
+
+st.subheader("Cargar archivo Cartera 90")
+archivo_cartera_90 = st.file_uploader("Subir archivo Cartera 90", type=["csv"], key="cartera_90")
 
 if st.button("Procesar Archivos"):
     if archivo_formato_55 and archivo_cartera_90_360 and archivo_cartera_90:
